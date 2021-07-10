@@ -42,35 +42,38 @@ if (bytes_to_send <= 0)
 之后在根据文件读写操作进行代码的编写。
 
 
-#2021年07月10日更新：
+##2021年07月10日更新：
+
 加入了定时器：
   创建一个客户链接数组，里面包含了对应的文件描述符和计时器，计时器的任务就是等待15秒关闭链接。每次监听到链接时，创建一个对应文件描述符的计时器，将次计时器更新进入定时器链表，并将倒计时更新为15秒，设置每五秒触发一次ALARM信号。并绑定相应的应该处理函数，执行信号处理函数时，会遍历链表中的所有计时器，将到期的链接关闭。
   值得注意的是如果一个链接反复的发送请求，应该也要更新计时器的时间，不仅如此，最重要的是在读取的时候也要更新，考虑到一些大文件会一直持续读取长达几个小时，所以每次读取操作的时候也要更新计时器记录的时间。
   
 解决了webbech测压失败的原因
    设置优雅关闭即可解决，之前设置的是1,0那么close直接立即返回，导致数据没有发送给客户端，导致了webbech测压失败。
-   struct linger tmp = {1, 1};//1,0的设置会导致上述问题
-   setsockopt(listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
- /*设置优雅断开
-  #include <arpa/inet.h>
-  struct linger {
-    int l_onoff;
-    int l_linger;
-  };
-  三种断开方式：
+   
+   
+     struct linger tmp = {1, 1};//1,0的设置会导致上述问题
+     setsockopt(listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
+     设置优雅断开
+      #include <arpa/inet.h>
+      struct linger {
+        int l_onoff;
+        int l_linger;
+      };
+      三种断开方式：
 
-  1. l_onoff = 0; l_linger忽略
-  close()立刻返回，底层会将未发送完的数据发送完成后再释放资源，即优雅退出。
+      1. l_onoff = 0; l_linger忽略
+      close()立刻返回，底层会将未发送完的数据发送完成后再释放资源，即优雅退出。
 
-  2. l_onoff != 0; l_linger = 0;
-  close()立刻返回，但不会发送未发送完成的数据，而是通过一个REST包强制的关闭socket描述符，即强制退出。
+      2. l_onoff != 0; l_linger = 0;
+      close()立刻返回，但不会发送未发送完成的数据，而是通过一个REST包强制的关闭socket描述符，即强制退出。
 
-  3. l_onoff != 0; l_linger > 0;
-  close()不会立刻返回，内核会延迟一段时间，这个时间就由l_linger的值来决定。如果超时时间到达之前，发送
-  完未发送的数据(包括FIN包)并得到另一端的确认，close()会返回正确，socket描述符优雅性退出。否则，close()
-  会直接返回错误值，未发送数据丢失，socket描述符被强制性退出。需要注意的时，如果socket描述符被设置为非堵
-  塞型，则close()会直接返回值。
-  */
+      3. l_onoff != 0; l_linger > 0;
+      close()不会立刻返回，内核会延迟一段时间，这个时间就由l_linger的值来决定。如果超时时间到达之前，发送
+      完未发送的数据(包括FIN包)并得到另一端的确认，close()会返回正确，socket描述符优雅性退出。否则，close()
+      会直接返回错误值，未发送数据丢失，socket描述符被强制性退出。需要注意的时，如果socket描述符被设置为非堵
+      塞型，则close()会直接返回值。
+      
    
 
 
