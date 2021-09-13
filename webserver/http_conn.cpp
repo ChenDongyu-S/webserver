@@ -14,7 +14,7 @@ const char* error_500_form = "There was an unusual problem serving the requested
 
 
 //网站的根目录
-const char* doc_root = "/home/chendongyu/Docment/webserver_test/webserver/root";
+const char* doc_root = "/home/chendongyu/root";
 
 //设置为非阻塞文件描述符
 int setnonblocking(int fd)
