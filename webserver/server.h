@@ -31,6 +31,7 @@
 #include "http_conn.h"
 #include "lst_time.h"
 #include "log.h"
+#include "sql_conn.h"
 
 #define MAX_FD 65536
 #define MAX_EVENT_NUMBER 10000
@@ -43,7 +44,8 @@ class server
 {
 public:
     server(){};
-    server(int port,int thread_number, int thread_task_number, int trig_model, int actor_model);
+    server( int port,int thread_number, int thread_task_number, int trig_model, 
+            int actor_model, string user,string password, string dataBaseName);
     ~server();
     //void init(int port,int thread_number = 10, int threak_task_number = 20);
     bool create_threadpool();
@@ -87,6 +89,7 @@ public:
 
     void client_init(int connfd, struct sockaddr_in client_address);
  
+    void sql_pool();
 
 private:
 
@@ -114,6 +117,16 @@ private:
     //模式选择
     int m_trig_model;//触发模式：ET：1、LT：2
     int m_actor_model;//反应堆模式：proactor：0；reactor：1
+
+    //数据库相关
+    connection_pool *m_connPool;
+
+    string m_user;         //登陆数据库用户名
+    string m_passWord;     //登陆数据库密码
+    string m_databaseName; //使用数据库名
+
+    int m_sql_num;
+
 
 };
 

@@ -8,6 +8,7 @@
 #include "locker.h"
 #include "log.h"
 #include "lst_time.h"
+#include "sql_conn.h"
 
 class util_timer;
 class sort_timer_lst;
@@ -17,7 +18,7 @@ class threadpool
 {
 public:
     /*thread_number是线程池中线程的数量，max_requests是请求队列中最多允许的、等待处理的请求的数量*/
-    threadpool( int thread_number, int max_request, int m_actor_model);
+    threadpool(connection_pool *connPool, int thread_number, int max_request, int m_actor_model);
     ~threadpool();
     bool append(T *request);   
 
@@ -35,13 +36,17 @@ private:
     sem m_queuestat;            //是否有任务需要处理
     bool m_stop;                //是否结束线程
     int m_actor_model;          //反应堆模式 
+
+    connection_pool *m_connPool;  //数据库连接池
+
 };
 template <typename T>
-threadpool<T>::threadpool(int thread_number, int max_requests, int actor_model) : 
+threadpool<T>::threadpool(connection_pool *connPool, int thread_number, int max_requests, int actor_model) : 
 m_thread_number(thread_number), 
 m_max_requests(max_requests), 
 m_stop(false),m_threads(NULL),
-m_actor_model(actor_model)
+m_actor_model(actor_model),
+m_connPool(connPool)
 {
     LOG_INFO("初始化线程池！\n");
     if (thread_number <= 0 || max_requests <= 0)
@@ -127,6 +132,9 @@ void threadpool<T>::run()
                 {
                     //只有读取成功需要这个
                     LOG_INFO("通过reactor模式读取成功\n");
+
+                    LOG_INFO("取到数据库链接\n");
+                    connectionRAII mysqlcon(&request->mysql, m_connPool);
                     request->process();
                 }
                 else
@@ -168,6 +176,8 @@ void threadpool<T>::run()
         }
         else
         {
+            LOG_INFO("取到数据库链接\n");
+            connectionRAII mysqlcon(&request->mysql, m_connPool);
             request->process();
         }
 

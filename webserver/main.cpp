@@ -62,20 +62,27 @@ int main(int argc, char* argv[])
 
     {
 
-        
+		string user = "cdy";
+		string password = "wsadcdy123ad";
+		string dataBaseName = "webData";
 
-        server webserver(port, 10, 10000, trig_model, actor_model);
+        server webserver(port, 10, 10000, trig_model, actor_model, user, password, dataBaseName);
 
         webserver.init_log();//默认开启，阻塞队列模式
 
-        if(!webserver.create_threadpool())
-        {
-            
-            return -1;
-        }
+        
         
         printf("create_http_conn\n");
         webserver.create_http_conn();
+
+		printf("create_sql\n");
+		webserver.sql_pool();
+
+		if(!webserver.create_threadpool())
+		{
+			
+			return -1;
+		}
 
         printf("create_listen\n");
         webserver.create_listen();

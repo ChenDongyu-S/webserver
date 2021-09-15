@@ -1,4 +1,6 @@
+#include <mysql/mysql.h>
 #include "http_conn.h"
+#include <fstream>
 
 //定义HTTP响应的状态信息
 const char* ok_200_title = "OK";
@@ -15,6 +17,53 @@ const char* error_500_form = "There was an unusual problem serving the requested
 
 //网站的根目录
 const char* doc_root = "/home/chendongyu/root";
+
+//map<string, string> users;
+locker m_lock;
+
+//数据库相关
+void http_conn::initmysql_result(connection_pool* connPool)
+{
+    //先从连接池中取一个连接
+    printf("先从连接池中取一个连接\n");
+    MYSQL *mysql = NULL;
+    connectionRAII mysqlcon(&mysql, connPool);
+
+    //在user表中检索username，passwd数据
+    printf("在user表中检索username，passwd数据\n");
+    if (mysql_query(mysql, "SELECT username,passwd FROM user"))
+    {
+        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+    }
+
+    //从表中检索完整的结果集
+    printf("从表中检索完整的结果集\n");
+    MYSQL_RES *result = mysql_store_result(mysql);
+
+    //返回结果集中的列数
+    printf("返回结果集中的列数\n");
+    if(result == NULL) printf("result wei kong\n");
+    int num_fields = mysql_num_fields(result);
+
+    //返回所有字段结构的数组
+    printf("返回所有字段结构的数组\n");
+    MYSQL_FIELD *fields = mysql_fetch_fields(result);
+
+    //从结果集中获取下一行，将对应的用户名和密码，存入map中
+    printf("从结果集中获取下一行，将对应的用户名和密码，存入map中\n");
+    while (MYSQL_ROW row = mysql_fetch_row(result))
+    {
+        string temp1(row[0]);
+        string temp2(row[1]);
+        m_users[temp1] = temp2;
+    }
+}
+
+
+
+
+
+
 
 //设置为非阻塞文件描述符
 int setnonblocking(int fd)
@@ -100,6 +149,13 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, int trig_model, sort_t
     // setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
     addfd(m_epollfd, sockfd, true, trig_model);
     ++m_user_count;
+
+
+    //strcpy(sql_user, user.c_str());
+    //strcpy(sql_passwd, passwd.c_str());
+    //strcpy(sql_name, sqlname.c_str());
+
+
     init();
 }
 
@@ -124,6 +180,7 @@ void http_conn::init()
 
     m_trig_model = 0;
     m_rw_state = 0;
+    mysql = NULL;
 }
 
 
@@ -228,6 +285,11 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char * text)
         LOG_ERROR("[-----%d-----]m_method get!\n",m_sockfd);
         m_method = GET;
     }
+    else if (strcasecmp(method,"POST") == 0)
+    {
+        m_method = POST;
+        m_is_post = 1;
+    }
     else
     {
         LOG_ERROR("[-----%d-----]BAD_REQUEST[m_method]\n",m_sockfd);
@@ -257,6 +319,11 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char * text)
         m_url = strchr(m_url, '/');
 
     }
+    if (strncasecmp(m_url, "https://", 8) == 0)
+    {
+        m_url += 8;
+        m_url = strchr(m_url, '/');
+    }
     if(!m_url || m_url[0] != '/')
     {
         LOG_ERROR("BAD_REQUEST[m_url和m_url[0]不一致]\n");
@@ -271,19 +338,24 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char * text)
 http_conn::HTTP_CODE http_conn::parse_headers(char * text)
 {
 
+    printf("解析头部行");
     if(text[0] == '\0')
     {
+        printf("text剩余内容：%s",text+1);
         //如果HTTP请求有消息体，则还需要读取m_content_length字节的消息体，状态机转移到CHECK_STATE_CONTENT状态
         if(m_content_length != 0)
         {
+            printf("解析完了，还有内容");
             m_checked_state = CHECK_STATE_CONTENT;
             return NO_REQUEST;
         }
         //否则说明我们已经得到了一个完整的HTTP请求
+        printf("否则说明我们已经得到了一个完整的HTTP请求");
         return GET_REQUEST;
     }
     else if(strncasecmp(text, "Connection:", 11) == 0)
     {
+        printf("------------------------------conn----------------/n");
         text += 11;
         text += strspn(text," \t");
         if(strcasecmp(text,"keep-alive") == 0)
@@ -292,31 +364,39 @@ http_conn::HTTP_CODE http_conn::parse_headers(char * text)
         }
     }
     //处理Content-length头部字段
-    else if(strncasecmp(text, "Content-Length", 15) == 0)
+    else if(strncasecmp(text, "Content-Length:", 15) == 0)
     {
         text += 15;
         text += strspn(text, " \t");
         m_content_length = atol(text);
+                printf("----------------------------------------------/n");
+        printf("/n/n strncasecmp:[%d]/n/n", m_content_length);
     }
     else if(strncasecmp(text, "Host:", 5) == 0)
     {
+        printf("-----------------------------------host-----------/n");
         text += 5;
         text += strspn(text, " \t");
         m_host = text;
     }
     else
     {
+        printf("---------------------------oop-------------------/n");
         LOG_INFO("oop! unknow header: %s\n", text);
     }
     return NO_REQUEST;
 }
 
-//我们没有真正解析HTTP请求的消息体，只是判断他是否被完整的读入了
+//判断他是否被完整的读入了
 http_conn::HTTP_CODE http_conn::parse_content(char * text)
 {
+    printf("panduan-----");
     if(m_read_idx >= (m_content_length + m_checked_idx))
     {
+        printf("内容行的内容为：&s", text);
         text[m_content_length] = '\0';
+        m_resquest_data = text;//读取剩下的内容行
+        printf("内容行的内容为：&s", text);
         return GET_REQUEST;
     }
     return NO_REQUEST;
@@ -336,6 +416,7 @@ http_conn::HTTP_CODE http_conn::process_read()
         text = get_line();
         m_start_line = m_checked_idx;//这里因为前面调用了parse_line导致计数器已经更新了
         LOG_INFO("process_read():got 1 http line:%s\n",text);
+        printf("process_read():got 1 http line:%s\n",text);
         switch (m_checked_state)
         {
             case CHECK_STATE_REQUESTION:
@@ -364,6 +445,7 @@ http_conn::HTTP_CODE http_conn::process_read()
             }
             case CHECK_STATE_CONTENT:
             {
+                printf("case CHECK_STATE_CONTENT:");
                 ret = parse_content(text);
                 if(ret == GET_REQUEST)
                 {
@@ -390,8 +472,87 @@ http_conn::HTTP_CODE http_conn::do_request()
     LOG_DEBUG("do_reaquest!\n");
     strcpy(m_real_file,doc_root);
     int len  = strlen(doc_root);
-    strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
 
+    const char *p = strrchr(m_url, '/');
+    
+    //处理登录界面load or register
+    if(m_method == POST && (*(p + 1) == 'l' || *(p + 1) == 'r') )
+    {
+        printf("处理登录界面load\n");
+        char name[100], password[100];
+        int i = 0;
+        //读取内容行中的用户名和密码  users=123&password=xxx
+        
+        printf("读取内容行中的用户名和密码\n");
+
+        for(i = 5; m_resquest_data[i] != '&'; ++i)
+        {
+            name[i - 5] = m_resquest_data[i];
+        }
+        printf("读完name:[%s]\n", name);
+        name[i - 5] = '\0';
+        int j = 0;
+        for(i = i + 10; m_resquest_data[i] != '\0'; ++i,++j)
+        {
+            password[j] = m_resquest_data[i];
+        }
+        password[j] = '\0';
+        printf("读完passwd\n");
+        //load
+        printf("登录\n");
+        if(*(p + 1) == 'l')
+        {
+            if(m_users.find(name) != m_users.end() && m_users[name] == password)
+            {
+                strcpy(m_url, "/index.html");
+            }
+            else
+            {
+                strcpy(m_url, "/logerror.html");
+            }
+        }
+        else
+        {
+            printf("注册\n");
+            //如果是注册，先检测数据库中是否有重名的
+            //没有重名的，进行增加数据
+            printf("name:[&s]\n",name);
+            printf("password:[&s]\n",password);
+            printf("语句插入ing\n");
+            char *sql_insert = (char *)malloc(sizeof(char) * 200);
+            strcpy(sql_insert, "INSERT INTO user(username, passwd) VALUES(");
+            strcat(sql_insert, "'");
+            strcat(sql_insert, name);
+            strcat(sql_insert, "', '");
+            strcat(sql_insert, password);
+            strcat(sql_insert, "')");   
+            printf("注册核对\n");
+            if (m_users.find(name) == m_users.end())
+            {
+                m_lock.lock();
+                printf("语句插入ing\n");
+                printf("语句插入ing:[%s]\n", sql_insert);
+
+
+                
+                int res = mysql_query(mysql, sql_insert);
+                printf("语句插入成功\n");
+                m_users.insert(pair<string, string>(name, password));
+                m_lock.unlock();
+
+                if (!res)
+                    strcpy(m_url, "/load.html");
+                else
+                    strcpy(m_url, "/registerError.html");
+            }
+            else
+                strcpy(m_url, "/registerError.html");
+        }
+
+    }
+
+
+    strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
     /*
     头文件：#include <sys/stat.h>   #include <unistd.h>
 

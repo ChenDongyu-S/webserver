@@ -18,10 +18,14 @@
 #include <sys/mman.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <map>
 
 #include "log.h"
 #include "locker.h"
 #include "lst_time.h"
+#include "sql_conn.h"
+
+using namespace std;
 
 class util_timer;
 class sort_timer_lst;
@@ -87,7 +91,7 @@ public:
 
 public:
     
-    void init(int sockfd, const sockaddr_in& addr, int trig_model, sort_timer_lst * timer_lsit);//初始化新的链接
+    void init(int sockfd, const sockaddr_in& addr, int trig_model, sort_timer_lst * timer_list);//初始化新的链接
    
     void close_conn(bool real_close = true); //关闭链接
     
@@ -135,7 +139,8 @@ public:
 
 
 
-
+    //数据库相关
+    void initmysql_result(connection_pool* );//获取数据库结果
 
 
 
@@ -179,7 +184,8 @@ public:
     static int m_epollfd;//所有socket上的时间都被注册到同一个epoll内核事件表中，所以将epoll文件描述符设置为静态的
     
     static int m_user_count;//统计用户数量
-
+    
+    MYSQL* mysql;
 
 private:
     
@@ -246,6 +252,15 @@ private:
     int m_rw_state;//读写状态 read:0 | write:1
 
     sort_timer_lst * m_timer_list;
+
+    //数据库相关
+    
+    int m_is_post;
+    char *m_resquest_data;
+    map<string, string> m_users;
+    char sql_user[100];
+    char sql_password[100];
+    char sql_name[100];
 
 };
 

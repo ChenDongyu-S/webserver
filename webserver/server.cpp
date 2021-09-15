@@ -24,7 +24,9 @@ void sig_handler(int sig)
 
 
 //初始化
-server::server(int port,int thread_number, int thread_task_number, int trig_model, int actor_model):
+server::server( int port,int thread_number, int thread_task_number, 
+                int trig_model, int actor_model, string user,
+                string password, string dataBaseName):
     m_port(port),
     m_thread_number(thread_number),
     m_thread_task_number(thread_task_number),
@@ -32,7 +34,10 @@ server::server(int port,int thread_number, int thread_task_number, int trig_mode
     m_close_log(0),
     m_is_block(1),
     m_trig_model(trig_model),
-    m_actor_model(actor_model)
+    m_actor_model(actor_model),
+    m_user(user),
+    m_passWord(password),
+    m_databaseName(dataBaseName)
 {
 
 }
@@ -50,6 +55,20 @@ void server::init_log()
     }
 }
 
+//初始化数据库连接池
+void server::sql_pool()
+{
+    printf("zhunbei init sql\n");
+    //初始化数据库连接池
+    m_connPool = connection_pool::GetInstance();
+    printf("init sql\n");
+    m_connPool->init("localhost", m_user, m_passWord, m_databaseName, 3306, 8, m_close_log);
+
+    //初始化数据库读取表
+    printf("init sql mysql\n");
+    users->initmysql_result(m_connPool);
+    printf("init sql end\n");
+}
 
 //释放堆区的空间
 server::~server()
@@ -72,7 +91,7 @@ server::~server()
 //     m_thread_task_number = thread_task_number;
 //     m_stop_server = stop_server;
 //     m_timeout = false;
-// }
+// }m_connPool
 
 
 
@@ -83,7 +102,7 @@ bool server::create_threadpool()
     m_pool = NULL;
     try
     {
-        m_pool = new threadpool<http_conn>(m_thread_number, m_thread_task_number, m_actor_model);
+        m_pool = new threadpool<http_conn>(m_connPool, m_thread_number, m_thread_task_number, m_actor_model);
         LOG_INFO("创建线程池完毕\n");
     }
     catch(...)
@@ -399,7 +418,7 @@ void server::write_thing(int sockfd)
 //主循环
 void server::main_loop()
 {
-    LOG_INFO("main_loop!\n");
+    // /LOG_INFO("main_loop!\n");
     m_timeout = false;
     m_stop_server = false;
     while(!m_stop_server)
