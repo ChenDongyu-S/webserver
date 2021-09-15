@@ -14,14 +14,16 @@
 
 
 搭建方法：
-## 搭建数据库：（参考自www.runoob.com）
-* mysql 安装请自行解决
-* 
-# 数据库连接：
+# 搭建数据库：（参考自www.runoob.com）
+```C++
+//mysql 安装
+...
+```
+* 数据库连接：
 ```C++
 mysql -u root -p
 ```
-# 数据库用户设置
+* 数据库用户设置
 ```C++
 mysql> INSERT INTO user 
           (host, user, password, 
@@ -31,11 +33,11 @@ mysql> INSERT INTO user
 
 mysql> FLUSH PRIVILEGES;
 ``` 
-# 创建数据库
+* 创建数据库
 ```C++
 mysql> create DATABASE RUNOOB;
 ```
-# 创建表与添加数据
+* 创建表与添加数据
 ```C++
 mysql>USE yourdb;
         CREATE TABLE user(
@@ -47,9 +49,9 @@ mysql>USE yourdb;
     INSERT INTO user(username, passwd) VALUES('name', 'passwd');
 ```
 
-# 修改main.cpp中你设置的数据库信息
+* 修改main.cpp中你设置的数据库信息
 
-## 服务器部署
+# 服务器部署
 * 下载源码
 * 修改http_conn.cpp文件中的网页资源目录doc_root（修改为你的资源所在的绝对目录）
 * make sever编译文件
