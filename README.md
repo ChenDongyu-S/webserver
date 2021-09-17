@@ -63,6 +63,24 @@ mysql>USE yourdb;
 * 项目框架：http://chendongyu.top:9000/log.html
 * 
 
+# 服务器测试
+* 下载webbench
+```
+[root@iZbp1iw4hobmafuvef0ijhZ webbench-1.5]# make webbench
+[root@iZbp1iw4hobmafuvef0ijhZ webbench-1.5]# ./webbench -c 800 -t 20 http://chendongyu.top:9002/log.html
+Webbench - Simple Web Benchmark 1.5
+Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.
+
+Benchmarking: GET http://chendongyu.top:9002/log.html
+800 clients, running 20 sec.
+
+Speed=51330 pages/min, 113768 bytes/sec.
+Requests: 17110 susceed, 0 failed.
+
+```
+测试结果如下，测试平台配置：单核心CPU，1G内存，40gSSD
+![image](https://user-images.githubusercontent.com/76243213/133824711-7794fe02-b939-4848-acca-cec5a4ecf0d7.png)
+
 
 
 以下为更新日记
